@@ -3,7 +3,7 @@
 
 #include "GTASA_STRUCTS.h"
 
-MYMOD(net.cowboy69.rusjj.ncoo, GTA NPC Climb Over Obstacles, 1.0, Cowboy69 & RusJJ)
+MYMOD(net.cowboy69.rusjj.ncoo, GTA NPC Climb Over Obstacles, 1.1, Cowboy69 & RusJJ)
 BEGIN_DEPLIST()
     ADD_DEPENDENCY_VER(net.rusjj.aml, 1.0.2.1)
 END_DEPLIST()
@@ -27,6 +27,7 @@ bool (*GetIsLineOfSightClear)(CVector const&,CVector const&,bool,bool,bool,bool,
 void (*SetTask)(CTaskManager*, CTask*, int, bool);
 CVector (*FindPlayerCoors)(int);
 CWanted* (*FindPlayerWanted)(int);
+CTask* (*Task_newOp)(unsigned int bytesSize);
 
 /////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////     Funcs     ///////////////////////////////
@@ -73,7 +74,7 @@ void ProcessPedClimbIfNeeded(CPed* ped)
     if (!ped->m_pIntelligence) return;
     if (!ped->IsPedInControl() || ped->m_PedFlags.bInVehicle) return;
 
-    if (ped->m_pIntelligence->m_TaskMgr.GetActiveTask()->GetTaskType() == TASK_COMPLEX_CLIMB)
+    if (ped->m_pIntelligence->m_TaskMgr.GetActiveTaskOfType(TASK_COMPLEX_CLIMB) != NULL)
     {
         ped->m_PedFlags.bIsStanding = true;
         return;
@@ -86,7 +87,7 @@ void ProcessPedClimbIfNeeded(CPed* ped)
     }
     else
     {
-        for (int i = 0; i < 5; ++i)
+        for (int i = 0; i < TASK_PRIMARY_MAX; ++i)
         {
             if (ped->m_pIntelligence->m_TaskMgr.m_aPrimaryTasks[i])
             {
@@ -118,14 +119,15 @@ void ProcessPedClimbIfNeeded(CPed* ped)
 
     if (!CanPedClimbNow(ped)) return;
 
-    CTaskComplexClimb* climbTask = New<CTaskComplexClimb>();
+    CTaskComplexClimb* climbTask = (CTaskComplexClimb*)Task_newOp(sizeof(CTaskComplexClimb));
     // Initialisation sentence
-    climbTask->vtable() = pGTASA + 0x6656A8; //_ZTV17CTaskComplexClimb;
-    climbTask->m_pParentTask = climbTask->m_pSubTask = NULL;
-    climbTask->m_bUsePlayerLaunchForce = false;
+    climbTask->vtable() = _ZTV17CTaskComplexClimb;
+    climbTask->m_pParentTask = NULL;
+    climbTask->m_pSubTask = NULL;
     climbTask->m_nForceClimb = 1;
+    climbTask->m_bUsePlayerLaunchForce = false;
     // Initialisation sentence end
-    SetTask(&ped->m_pIntelligence->m_TaskMgr, climbTask, 1, false);
+    SetTask(&ped->m_pIntelligence->m_TaskMgr, climbTask, TASK_PRIMARY_EVENT_RESPONSE_TEMP, false);
 
     if (ped->m_vecMoveSpeed.Magnitude() < 0.01f)
     {
@@ -162,6 +164,7 @@ extern "C" void OnModPreLoad()
     SET_TO(SetTask,                         aml->GetSym(hGTASA, "_ZN12CTaskManager7SetTaskEP5CTaskib"));
     SET_TO(FindPlayerCoors,                 aml->GetSym(hGTASA, "_Z15FindPlayerCoorsi"));
     SET_TO(FindPlayerWanted,                aml->GetSym(hGTASA, "_Z16FindPlayerWantedi"));
+    SET_TO(Task_newOp,                      aml->GetSym(hGTASA, "_ZN5CTasknwEj"));
 
     // GTA Hooks
     HOOK(ProcessPedControl,                 aml->GetSym(hGTASA, "_ZN4CPed14ProcessControlEv"));
