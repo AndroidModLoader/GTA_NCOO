@@ -168,7 +168,7 @@ extern "C" void OnModPreLoad()
     SET_TO(SetTask,                         aml->GetSym(hGTASA, "_ZN12CTaskManager7SetTaskEP5CTaskib"));
     SET_TO(FindPlayerCoors,                 aml->GetSym(hGTASA, "_Z15FindPlayerCoorsi"));
     SET_TO(FindPlayerWanted,                aml->GetSym(hGTASA, "_Z16FindPlayerWantedi"));
-    SET_TO(Task_newOp,                      aml->GetSym(hGTASA, "_ZN5CTasknwEj"));
+    SET_TO(Task_newOp,                      aml->GetSym(hGTASA, BYBIT("_ZN5CTasknwEj", "_ZN5CTasknwEm")));
 
     // GTA Hooks
     HOOK(ProcessPedControl,                 aml->GetSym(hGTASA, "_ZN4CPed14ProcessControlEv"));
