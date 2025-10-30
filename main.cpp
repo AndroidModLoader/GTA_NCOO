@@ -32,6 +32,7 @@ void (*SetTask)(CTaskManager*, CTask*, int, bool);
 CVector (*FindPlayerCoors)(int);
 CWanted* (*FindPlayerWanted)(int);
 CTask* (*Task_newOp)(unsigned int bytesSize);
+CTask* (*FindTaskByType)(CPedIntelligence*, const int);
 
 /////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////     Funcs     ///////////////////////////////
@@ -169,6 +170,7 @@ extern "C" void OnModPreLoad()
     SET_TO(FindPlayerCoors,                 aml->GetSym(hGTASA, "_Z15FindPlayerCoorsi"));
     SET_TO(FindPlayerWanted,                aml->GetSym(hGTASA, "_Z16FindPlayerWantedi"));
     SET_TO(Task_newOp,                      aml->GetSym(hGTASA, BYBIT("_ZN5CTasknwEj", "_ZN5CTasknwEm")));
+    SET_TO(FindTaskByType,                  aml->GetSym(hGTASA, "_ZNK16CPedIntelligence14FindTaskByTypeEi"));
 
     // GTA Hooks
     HOOK(ProcessPedControl,                 aml->GetSym(hGTASA, "_ZN4CPed14ProcessControlEv"));
