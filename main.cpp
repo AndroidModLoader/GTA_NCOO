@@ -1,9 +1,13 @@
 #include <mod/amlmod.h>
 #include <mod/logger.h>
 
-#include "GTASA_STRUCTS.h"
+#ifdef AML32
+    #include "GTASA_STRUCTS.h"
+#else
+    #include "GTASA_STRUCTS_210.h"
+#endif
 
-MYMOD(net.cowboy69.rusjj.ncoo, GTA NPC Climb Over Obstacles, 1.1, Cowboy69 & RusJJ)
+MYMOD(net.cowboy69.rusjj.ncoo, GTA NPC Climb Over Obstacles, 1.2, Cowboy69 & RusJJ)
 BEGIN_DEPLIST()
     ADD_DEPENDENCY_VER(net.rusjj.aml, 1.0.2.1)
 END_DEPLIST()
@@ -156,7 +160,7 @@ extern "C" void OnModPreLoad()
     hGTASA = aml->GetLibHandle("libGTASA.so");
     
     // GTA Variables
-    SET_TO(_ZTV17CTaskComplexClimb,         aml->GetSym(hGTASA, "_ZTV17CTaskComplexClimb")); _ZTV17CTaskComplexClimb += 0x8;
+    SET_TO(_ZTV17CTaskComplexClimb,         aml->GetSym(hGTASA, "_ZTV17CTaskComplexClimb")); _ZTV17CTaskComplexClimb += 2 * sizeof(void*);
 
     // GTA Functions
     SET_TO(ProcessLineOfSight,              aml->GetSym(hGTASA, "_ZN6CWorld18ProcessLineOfSightERK7CVectorS2_R9CColPointRP7CEntitybbbbbbbb"));
