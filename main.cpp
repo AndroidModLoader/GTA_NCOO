@@ -31,13 +31,13 @@ bool (*GetIsLineOfSightClear)(CVector const&,CVector const&,bool,bool,bool,bool,
 void (*SetTask)(CTaskManager*, CTask*, int, bool);
 CVector (*FindPlayerCoors)(int);
 CWanted* (*FindPlayerWanted)(int);
-CTask* (*Task_newOp)(unsigned int bytesSize);
+CTask* (*Task_newOp)(uintptr_t bytesSize);
 CTask* (*FindTaskByType)(CPedIntelligence*, const int);
 
 /////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////     Funcs     ///////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
-bool CanPedClimbNow(CPed* ped)
+inline bool CanPedClimbNow(CPed* ped)
 {
     CVector& startPos = ped->GetPosition();
     CVector& forward = ped->m_matrix->up;
@@ -56,7 +56,7 @@ bool CanPedClimbNow(CPed* ped)
     if (bDownFrontObstacle && bUpFrontClear3)
     {
         float angle = DotProduct(forward, colPoint.m_vecNormal);
-        if (abs(angle) < 0.9f || abs(angle) > 1.1f) return false;
+        if (fabsf(angle) < 0.9f || fabsf(angle) > 1.1f) return false;
     }
 
     if (bDownFrontObstacle && colPoint.m_vecNormal.z < 0.75f && bCenterFrontClear && bUpFrontClear)
@@ -72,7 +72,11 @@ bool CanPedClimbNow(CPed* ped)
         return bUpFrontClear3 && colPoint.m_vecNormal.z < 0.75f;
     }
 }
-void ProcessPedClimbIfNeeded(CPed* ped)
+inline bool DoesTaskMeetRequirements(CPed* ped, CTask* task)
+{
+    return true;
+}
+inline void ProcessPedClimbIfNeeded(CPed* ped)
 {
     if (ped->IsPlayer()) return;
     if (ped->m_bIsStuck || ped->m_PedFlags.bHeadStuckInCollision) return;
@@ -85,10 +89,9 @@ void ProcessPedClimbIfNeeded(CPed* ped)
         return;
     }
 
-    bool bDoesntAttack = true;
     if (ped->m_nPedType == PED_TYPE_COP && FindPlayerWanted(0)->m_nWantedLevel > 0)
     {
-        bDoesntAttack = false;
+        return;
     }
     else
     {
@@ -97,27 +100,29 @@ void ProcessPedClimbIfNeeded(CPed* ped)
             if (ped->m_pIntelligence->m_TaskMgr.m_aPrimaryTasks[i])
             {
                 eTaskType taskType = ped->m_pIntelligence->m_TaskMgr.m_aPrimaryTasks[i]->GetTaskType();
-                if ((taskType >= TASK_COMPLEX_KILL_PED_ON_FOOT && taskType <= TASK_KILL_PED_GROUP_ON_FOOT) || 
-                    taskType == TASK_SIMPLE_FIGHT || taskType == TASK_SIMPLE_USE_GUN || taskType == TASK_COMPLEX_BE_IN_GROUP)
+                if ((taskType >= TASK_COMPLEX_KILL_PED_ON_FOOT && taskType <= TASK_SIMPLE_USE_GUN) /*|| 
+                     taskType == TASK_COMPLEX_BE_IN_GROUP*/ )
                 {
-                    bDoesntAttack = false;
-                    break;
+                    if(DoesTaskMeetRequirements(ped, ped->m_pIntelligence->m_TaskMgr.m_aPrimaryTasks[i]))
+                    {
+                        return;
+                    }
                 }
             }
             else if (ped->m_pIntelligence->m_TaskMgr.m_aSecondaryTasks[i])
             {
                 eTaskType taskType = ped->m_pIntelligence->m_TaskMgr.m_aSecondaryTasks[i]->GetTaskType();
-                if ((taskType >= TASK_COMPLEX_KILL_PED_ON_FOOT && taskType <= TASK_KILL_PED_GROUP_ON_FOOT) || 
-                    taskType == TASK_SIMPLE_FIGHT || taskType == TASK_SIMPLE_USE_GUN || taskType == TASK_COMPLEX_BE_IN_GROUP)
+                if ((taskType >= TASK_COMPLEX_KILL_PED_ON_FOOT && taskType <= TASK_SIMPLE_USE_GUN) /*|| 
+                     taskType == TASK_COMPLEX_BE_IN_GROUP*/ )
                 {
-
-                    bDoesntAttack = false;
-                    break;
+                    if(DoesTaskMeetRequirements(ped, ped->m_pIntelligence->m_TaskMgr.m_aSecondaryTasks[i]))
+                    {
+                        return;
+                    }
                 }
             }
         }
     }
-    if (bDoesntAttack) return;
 
     CVector pedCoors = FindPlayerCoors(0);
     if (DistanceBetweenPoints(pedCoors, ped->GetPosition()) < 2.0f) return;
