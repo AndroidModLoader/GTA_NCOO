@@ -22,6 +22,7 @@ void* hGTASA;
 ///////////////////////////////     Vars      ///////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
 uintptr_t _ZTV17CTaskComplexClimb;
+CPed* g_pLastTarget;
 
 /////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////     Funcs     ///////////////////////////////
@@ -29,10 +30,10 @@ uintptr_t _ZTV17CTaskComplexClimb;
 bool (*ProcessLineOfSight)(CVector const&,CVector const&,CColPoint &,CEntity *&,bool,bool,bool,bool,bool,bool,bool,bool);
 bool (*GetIsLineOfSightClear)(CVector const&,CVector const&,bool,bool,bool,bool,bool,bool,bool);
 void (*SetTask)(CTaskManager*, CTask*, int, bool);
-CVector (*FindPlayerCoors)(int);
 CWanted* (*FindPlayerWanted)(int);
 CTask* (*Task_newOp)(uintptr_t bytesSize);
 CTask* (*FindTaskByType)(CPedIntelligence*, const int);
+CPed* (*FindPlayerPed)(int);
 
 /////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////     Funcs     ///////////////////////////////
@@ -42,12 +43,8 @@ inline bool CanPedClimbNow(CPed* ped)
     CVector& startPos = ped->GetPosition();
     CVector& forward = ped->m_matrix->up;
     
-    bool bCenterFrontClear = GetIsLineOfSightClear(startPos, startPos + forward * 2.0f, true, false, false, true, false, false, true);
-    bool bUpFrontClear = GetIsLineOfSightClear(startPos + CVector(0.0f, 0.0f, 0.5f), startPos + CVector(0.0f, 0.0f, 0.5f) + forward * 3.0f, true, false, false, true, false, false, true);
-    bool bUpFrontClear2 = GetIsLineOfSightClear(startPos + CVector(0.0f, 0.0f, 1.0f), startPos + CVector(0.0f, 0.0f, 1.0f) + forward * 3.0f, true, false, false, true, false, false, true);
     bool bUpFrontClear3 = GetIsLineOfSightClear(startPos + CVector(0.0f, 0.0f, 2.0f), startPos + CVector(0.0f, 0.0f, 2.0f) + forward * 0.5f, true, false, false, true, false, true, true);
-    bool bAboveClear = GetIsLineOfSightClear(startPos, startPos + CVector(0.0f, 0.0f, 2.0f), true, false, false, true, false, true, true);
-
+    
     CColPoint colPoint;
     CEntity* entity;
     bool bDownFrontObstacle = ProcessLineOfSight(startPos - CVector(0.0f, 0.0f, 0.6f), startPos - CVector(0.0f, 0.0f, 0.6f) + forward * 3.0f, colPoint, entity, 
@@ -59,18 +56,21 @@ inline bool CanPedClimbNow(CPed* ped)
         if (fabsf(angle) < 0.9f || fabsf(angle) > 1.1f) return false;
     }
 
+    bool bCenterFrontClear = GetIsLineOfSightClear(startPos, startPos + forward * 2.0f, true, false, false, true, false, false, true);
+    bool bUpFrontClear = GetIsLineOfSightClear(startPos + CVector(0.0f, 0.0f, 0.5f), startPos + CVector(0.0f, 0.0f, 0.5f) + forward * 3.0f, true, false, false, true, false, false, true);
     if (bDownFrontObstacle && colPoint.m_vecNormal.z < 0.75f && bCenterFrontClear && bUpFrontClear)
     {
         return true;
     }
-    else if ((bCenterFrontClear && bUpFrontClear && bUpFrontClear2) || !bAboveClear)
+    
+    bool bUpFrontClear2 = GetIsLineOfSightClear(startPos + CVector(0.0f, 0.0f, 1.0f), startPos + CVector(0.0f, 0.0f, 1.0f) + forward * 3.0f, true, false, false, true, false, false, true);
+    bool bAboveClear = GetIsLineOfSightClear(startPos, startPos + CVector(0.0f, 0.0f, 2.0f), true, false, false, true, false, true, true);
+    if ((bCenterFrontClear && bUpFrontClear && bUpFrontClear2) || !bAboveClear)
     {
         return false;
     }
-    else
-    {
-        return bUpFrontClear3 && colPoint.m_vecNormal.z < 0.75f;
-    }
+    
+    return (bUpFrontClear3 && colPoint.m_vecNormal.z < 0.75f);
 }
 inline bool DoesTaskMeetRequirements(CPed* ped, CTask* task)
 {
@@ -89,9 +89,10 @@ inline void ProcessPedClimbIfNeeded(CPed* ped)
         return;
     }
 
+    g_pLastTarget = FindPlayerPed(-1);
     if (ped->m_nPedType == PED_TYPE_COP && FindPlayerWanted(0)->m_nWantedLevel > 0)
     {
-        return;
+        // Cops should definitely follow us.
     }
     else
     {
@@ -105,7 +106,7 @@ inline void ProcessPedClimbIfNeeded(CPed* ped)
                 {
                     if(DoesTaskMeetRequirements(ped, ped->m_pIntelligence->m_TaskMgr.m_aPrimaryTasks[i]))
                     {
-                        return;
+                        break;
                     }
                 }
             }
@@ -117,16 +118,17 @@ inline void ProcessPedClimbIfNeeded(CPed* ped)
                 {
                     if(DoesTaskMeetRequirements(ped, ped->m_pIntelligence->m_TaskMgr.m_aSecondaryTasks[i]))
                     {
-                        return;
+                        break;
                     }
                 }
             }
+            if(i == TASK_PRIMARY_MAX-1) return;
         }
     }
 
-    CVector pedCoors = FindPlayerCoors(0);
-    if (DistanceBetweenPoints(pedCoors, ped->GetPosition()) < 2.0f) return;
-
+    CVector& pos = ped->GetPosition();
+    CVector& tpos = g_pLastTarget->GetPosition();
+    if (pos.z > tpos.z || DistanceBetweenPoints(pos, tpos) < 2.0f) return;
     if (!CanPedClimbNow(ped)) return;
 
     CTaskComplexClimb* climbTask = (CTaskComplexClimb*)Task_newOp(sizeof(CTaskComplexClimb));
@@ -139,7 +141,7 @@ inline void ProcessPedClimbIfNeeded(CPed* ped)
     // Initialisation sentence end
     SetTask(&ped->m_pIntelligence->m_TaskMgr, climbTask, TASK_PRIMARY_EVENT_RESPONSE_TEMP, false);
 
-    if (ped->m_vecMoveSpeed.Magnitude() < 0.01f)
+    if (ped->m_vecMoveSpeed.MagnitudeSqr() < 0.0001f)
     {
         ped->m_vecMoveSpeed += CVector(0.0f, 0.0f, 0.08f) + ped->m_matrix->up * 0.1f;
     }
@@ -172,10 +174,10 @@ extern "C" void OnModPreLoad()
     SET_TO(ProcessLineOfSight,              aml->GetSym(hGTASA, "_ZN6CWorld18ProcessLineOfSightERK7CVectorS2_R9CColPointRP7CEntitybbbbbbbb"));
     SET_TO(GetIsLineOfSightClear,           aml->GetSym(hGTASA, "_ZN6CWorld21GetIsLineOfSightClearERK7CVectorS2_bbbbbbb"));
     SET_TO(SetTask,                         aml->GetSym(hGTASA, "_ZN12CTaskManager7SetTaskEP5CTaskib"));
-    SET_TO(FindPlayerCoors,                 aml->GetSym(hGTASA, "_Z15FindPlayerCoorsi"));
     SET_TO(FindPlayerWanted,                aml->GetSym(hGTASA, "_Z16FindPlayerWantedi"));
     SET_TO(Task_newOp,                      aml->GetSym(hGTASA, BYBIT("_ZN5CTasknwEj", "_ZN5CTasknwEm")));
     SET_TO(FindTaskByType,                  aml->GetSym(hGTASA, "_ZNK16CPedIntelligence14FindTaskByTypeEi"));
+    SET_TO(FindPlayerPed,                   aml->GetSym(hGTASA, "_Z13FindPlayerPedi"));
 
     // GTA Hooks
     HOOK(ProcessPedControl,                 aml->GetSym(hGTASA, "_ZN4CPed14ProcessControlEv"));
