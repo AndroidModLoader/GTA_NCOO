@@ -201,7 +201,7 @@ inline void ProcessPedClimbIfNeeded(CPed* ped)
     {
         CVector& pos = ped->GetPosition();
         CVector& tpos = g_pLastTarget->GetPosition();
-        if (pos.z > tpos.z || DistanceBetweenPoints(pos, tpos) < 2.0f) return;
+        if ((pos.z - tpos.z) > 4.0f || DistanceBetweenPoints(pos, tpos) < 2.0f) return;
     }
     if (!CanPedClimbNow(ped)) return;
 
