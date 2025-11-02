@@ -22,7 +22,7 @@ void* hGTASA;
 ///////////////////////////////     Vars      ///////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
 uintptr_t _ZTV17CTaskComplexClimb;
-CPed* g_pLastTarget;
+CEntity* g_pLastTarget;
 
 /////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////     Funcs     ///////////////////////////////
@@ -74,14 +74,95 @@ inline bool CanPedClimbNow(CPed* ped)
 }
 inline bool DoesTaskMeetRequirements(CPed* ped, CTask* task)
 {
+    switch(task->GetTaskType())
+    {
+        default: return false;
+
+        case TASK_COMPLEX_KILL_PED_ON_FOOT:
+        {
+            CTaskComplexKillPedOnFoot* tt = (CTaskComplexKillPedOnFoot*)task;
+            if(tt->m_pTargetPed != NULL)
+            {
+                g_pLastTarget = tt->m_pTargetPed;
+                break;
+            }
+            return false;
+        }
+
+        case TASK_COMPLEX_KILL_PED_ON_FOOT_MELEE:
+        {
+            CTaskComplexKillPedOnFootMelee* tt = (CTaskComplexKillPedOnFootMelee*)task;
+            if(tt->m_pTargetPed != NULL)
+            {
+                g_pLastTarget = tt->m_pTargetPed;
+                break;
+            }
+            return false;
+        }
+
+        case TASK_COMPLEX_KILL_PED_ON_FOOT_ARMED:
+        {
+            CTaskComplexKillPedOnFootArmed* tt = (CTaskComplexKillPedOnFootArmed*)task;
+            if(tt->m_pTargetPed != NULL)
+            {
+                g_pLastTarget = tt->m_pTargetPed;
+                break;
+            }
+            return false;
+        }
+
+        case TASK_COMPLEX_DESTROY_CAR:
+        case TASK_COMPLEX_DESTROY_CAR_MELEE:
+        case TASK_COMPLEX_DESTROY_CAR_ARMED:
+        {
+            CTaskComplexDestroyCar* tt = (CTaskComplexDestroyCar*)task;
+            if(tt->m_pTargetVehicle != NULL)
+            {
+                g_pLastTarget = tt->m_pTargetVehicle;
+                break;
+            }
+            return false;
+        }
+
+        case TASK_KILL_PED_GROUP_ON_FOOT:
+        {
+            CTaskComplexKillPedGroupOnFoot* tt = (CTaskComplexKillPedGroupOnFoot*)task;
+            if(tt->m_pCurrentPed != NULL)
+            {
+                g_pLastTarget = tt->m_pCurrentPed;
+                break;
+            }
+            return false;
+        }
+
+        case TASK_SIMPLE_FIGHT:
+        {
+            CTaskSimpleFight* tt = (CTaskSimpleFight*)task;
+            if(tt->m_pTargetEntity != NULL)
+            {
+                g_pLastTarget = tt->m_pTargetEntity;
+                break;
+            }
+            return false;
+        }
+
+        case TASK_SIMPLE_USE_GUN:
+        {
+            CTaskSimpleUseGun* tt = (CTaskSimpleUseGun*)task;
+            if(tt->m_pTargetEntity != NULL)
+            {
+                g_pLastTarget = tt->m_pTargetEntity;
+                break;
+            }
+            return false;
+        }
+    }
     return true;
 }
 inline void ProcessPedClimbIfNeeded(CPed* ped)
 {
-    if (ped->IsPlayer()) return;
-    if (ped->m_bIsStuck || ped->m_PedFlags.bHeadStuckInCollision) return;
-    if (!ped->m_pIntelligence) return;
-    if (!ped->IsPedInControl() || ped->m_PedFlags.bInVehicle) return;
+    if (!ped->m_pIntelligence || ped->IsPlayer() || !ped->IsPedInControl()) return;
+    if (ped->m_bIsStuck || ped->m_PedFlags.bHeadStuckInCollision || ped->m_PedFlags.bInVehicle) return;
 
     if (ped->m_pIntelligence->m_TaskMgr.GetActiveTaskOfType(TASK_COMPLEX_CLIMB) != NULL)
     {
@@ -100,35 +181,28 @@ inline void ProcessPedClimbIfNeeded(CPed* ped)
         {
             if (ped->m_pIntelligence->m_TaskMgr.m_aPrimaryTasks[i])
             {
-                eTaskType taskType = ped->m_pIntelligence->m_TaskMgr.m_aPrimaryTasks[i]->GetTaskType();
-                if ((taskType >= TASK_COMPLEX_KILL_PED_ON_FOOT && taskType <= TASK_SIMPLE_USE_GUN) /*|| 
-                     taskType == TASK_COMPLEX_BE_IN_GROUP*/ )
+                if(DoesTaskMeetRequirements(ped, ped->m_pIntelligence->m_TaskMgr.m_aPrimaryTasks[i]))
                 {
-                    if(DoesTaskMeetRequirements(ped, ped->m_pIntelligence->m_TaskMgr.m_aPrimaryTasks[i]))
-                    {
-                        break;
-                    }
+                    break;
                 }
             }
             else if (ped->m_pIntelligence->m_TaskMgr.m_aSecondaryTasks[i])
             {
-                eTaskType taskType = ped->m_pIntelligence->m_TaskMgr.m_aSecondaryTasks[i]->GetTaskType();
-                if ((taskType >= TASK_COMPLEX_KILL_PED_ON_FOOT && taskType <= TASK_SIMPLE_USE_GUN) /*|| 
-                     taskType == TASK_COMPLEX_BE_IN_GROUP*/ )
+                if(DoesTaskMeetRequirements(ped, ped->m_pIntelligence->m_TaskMgr.m_aSecondaryTasks[i]))
                 {
-                    if(DoesTaskMeetRequirements(ped, ped->m_pIntelligence->m_TaskMgr.m_aSecondaryTasks[i]))
-                    {
-                        break;
-                    }
+                    break;
                 }
             }
             if(i == TASK_PRIMARY_MAX-1) return;
         }
     }
 
-    CVector& pos = ped->GetPosition();
-    CVector& tpos = g_pLastTarget->GetPosition();
-    if (pos.z > tpos.z || DistanceBetweenPoints(pos, tpos) < 2.0f) return;
+    if(g_pLastTarget)
+    {
+        CVector& pos = ped->GetPosition();
+        CVector& tpos = g_pLastTarget->GetPosition();
+        if (pos.z > tpos.z || DistanceBetweenPoints(pos, tpos) < 2.0f) return;
+    }
     if (!CanPedClimbNow(ped)) return;
 
     CTaskComplexClimb* climbTask = (CTaskComplexClimb*)Task_newOp(sizeof(CTaskComplexClimb));
@@ -160,7 +234,7 @@ DECL_HOOKv(ProcessPedControl, CPed* ped)
 /////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////     Main     ////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
-extern "C" void OnModPreLoad()
+ON_MOD_PRELOAD()
 {
     logger->SetTag("NCOO");
     
@@ -168,17 +242,17 @@ extern "C" void OnModPreLoad()
     hGTASA = aml->GetLibHandle("libGTASA.so");
     
     // GTA Variables
-    SET_TO(_ZTV17CTaskComplexClimb,         aml->GetSym(hGTASA, "_ZTV17CTaskComplexClimb")); _ZTV17CTaskComplexClimb += 2 * sizeof(void*);
+    SET_TO(_ZTV17CTaskComplexClimb, aml->GetSym(hGTASA, "_ZTV17CTaskComplexClimb")); _ZTV17CTaskComplexClimb += 2 * sizeof(void*);
 
     // GTA Functions
-    SET_TO(ProcessLineOfSight,              aml->GetSym(hGTASA, "_ZN6CWorld18ProcessLineOfSightERK7CVectorS2_R9CColPointRP7CEntitybbbbbbbb"));
-    SET_TO(GetIsLineOfSightClear,           aml->GetSym(hGTASA, "_ZN6CWorld21GetIsLineOfSightClearERK7CVectorS2_bbbbbbb"));
-    SET_TO(SetTask,                         aml->GetSym(hGTASA, "_ZN12CTaskManager7SetTaskEP5CTaskib"));
-    SET_TO(FindPlayerWanted,                aml->GetSym(hGTASA, "_Z16FindPlayerWantedi"));
-    SET_TO(Task_newOp,                      aml->GetSym(hGTASA, BYBIT("_ZN5CTasknwEj", "_ZN5CTasknwEm")));
-    SET_TO(FindTaskByType,                  aml->GetSym(hGTASA, "_ZNK16CPedIntelligence14FindTaskByTypeEi"));
-    SET_TO(FindPlayerPed,                   aml->GetSym(hGTASA, "_Z13FindPlayerPedi"));
+    SET_TO(ProcessLineOfSight,      aml->GetSym(hGTASA, "_ZN6CWorld18ProcessLineOfSightERK7CVectorS2_R9CColPointRP7CEntitybbbbbbbb"));
+    SET_TO(GetIsLineOfSightClear,   aml->GetSym(hGTASA, "_ZN6CWorld21GetIsLineOfSightClearERK7CVectorS2_bbbbbbb"));
+    SET_TO(SetTask,                 aml->GetSym(hGTASA, "_ZN12CTaskManager7SetTaskEP5CTaskib"));
+    SET_TO(FindPlayerWanted,        aml->GetSym(hGTASA, "_Z16FindPlayerWantedi"));
+    SET_TO(Task_newOp,              aml->GetSym(hGTASA, BYBIT("_ZN5CTasknwEj", "_ZN5CTasknwEm")));
+    SET_TO(FindTaskByType,          aml->GetSym(hGTASA, "_ZNK16CPedIntelligence14FindTaskByTypeEi"));
+    SET_TO(FindPlayerPed,           aml->GetSym(hGTASA, "_Z13FindPlayerPedi"));
 
     // GTA Hooks
-    HOOK(ProcessPedControl,                 aml->GetSym(hGTASA, "_ZN4CPed14ProcessControlEv"));
+    HOOK(ProcessPedControl,         aml->GetSym(hGTASA, "_ZN4CPed14ProcessControlEv"));
 }
